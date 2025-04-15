@@ -1,50 +1,45 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { useUser } from './UserContext'; // Import UserContext
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useUser } from './UserContext';
 
 export default function EditProfile({ navigation }) {
-  const { user, setUser, setIsEditing } = useUser(); // Sử dụng UserContext
-  const [name, setName] = useState(user.name);
-  const [email, setEmail] = useState(user.email);
-  const [phone, setPhone] = useState(user.phone);
-  const [address, setAddress] = useState(user.address);
+  const { user, setUser, setIsEditing } = useUser();
+
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <Text>Đang tải thông tin người dùng...</Text>
+      </View>
+    );
+  }
+
+  const [name, setName] = useState(user.name || '');
+  const [email, setEmail] = useState(user.email || '');
+  const [phone, setPhone] = useState(user.phone || '');
+  const [address, setAddress] = useState(user.address || '');
 
   const handleSave = () => {
-    setUser({ name, email, phone, address }); // Cập nhật thông tin người dùng
-    setIsEditing(false); // Đặt lại state isEditing
-    navigation.goBack(); // Navigate back to ProfileScreen after saving
+    setUser({
+      ...user,
+      name,
+      email,
+      phone,
+      address,
+    });
+
+    setIsEditing(false);
+    Alert.alert('Thành công', 'Thông tin đã được cập nhật');
+    navigation.goBack();
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Chỉnh sửa thông tin</Text>
-      <TextInput
-        style={styles.input}
-        value={name}
-        onChangeText={setName}
-        placeholder="Tên"
-      />
-      <TextInput
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-        placeholder="Email"
-        keyboardType="email-address"
-      />
-      <TextInput
-        style={styles.input}
-        value={phone}
-        onChangeText={setPhone}
-        placeholder="Số điện thoại"
-        keyboardType="phone-pad"
-      />
-      <TextInput
-        style={styles.input}
-        value={address}
-        onChangeText={setAddress}
-        placeholder="Địa chỉ"
-      />
-      <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+      <TextInput style={styles.input} placeholder="Họ tên" value={name} onChangeText={setName} />
+      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
+      <TextInput style={styles.input} placeholder="Số điện thoại" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+      <TextInput style={styles.input} placeholder="Địa chỉ" value={address} onChangeText={setAddress} />
+      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Lưu</Text>
       </TouchableOpacity>
     </View>
@@ -63,22 +58,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   input: {
-    height: 40,
+    height: 45,
     borderColor: '#0078FF',
     borderWidth: 1,
-    marginBottom: 15,
+    borderRadius: 5,
     paddingHorizontal: 10,
+    marginBottom: 15,
   },
   saveButton: {
-    marginTop: 20,
-    padding: 10,
     backgroundColor: '#0078FF',
+    padding: 15,
     borderRadius: 5,
+    alignItems: 'center',
   },
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
   },
 });

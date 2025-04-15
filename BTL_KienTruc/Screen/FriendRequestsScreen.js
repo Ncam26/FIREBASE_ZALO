@@ -2,7 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { db } from '../Firebase/Firebase';
 import { getAuth } from 'firebase/auth';
-import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  doc,
+  setDoc,
+} from 'firebase/firestore';
 
 export default function FriendRequestsScreen() {
   const [requests, setRequests] = useState([]);
@@ -14,40 +23,41 @@ export default function FriendRequestsScreen() {
 
     const fetchRequests = async () => {
       try {
-        const q = query(collection(db, 'friend_requests'), where('to', '==', currentUser.uid));
-        const querySnapshot = await getDocs(q);
-  
-        const requestsData = await Promise.all(querySnapshot.docs.map(async (docSnap) => {
-          const data = docSnap.data();
-  
-          // Lấy thêm thông tin người gửi
-          const userRef = doc(db, 'users', data.from);
-          const userSnap = await getDocs(query(collection(db, 'users'), where('uid', '==', data.from)));
-          const sender = !userSnap.empty ? userSnap.docs[0].data() : { name: 'Không rõ', email: '' };
-  
-          return {
-            id: docSnap.id,
-            ...data,
-            senderName: sender.name || sender.email, // ưu tiên name
-          };
+        const q = query(collection(db, 'friend_requests'), where('to', '==', currentUser.uid), where('status', '==', 'pending'));
+        const snapshot = await getDocs(q);
+        const result = snapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data(),
         }));
-  
-        setRequests(requestsData);
-      } catch (error) {
-        console.error(error);
-        Alert.alert('Lỗi', 'Không thể lấy danh sách lời mời.');
+        setRequests(result);
+      } catch (err) {
+        console.error(err);
+        Alert.alert('Lỗi', 'Không thể lấy danh sách lời mời kết bạn.');
       }
     };
-  
+
     fetchRequests();
   }, []);
 
   const acceptRequest = async (request) => {
     try {
+      // Cập nhật trạng thái friend_requests
       await updateDoc(doc(db, 'friend_requests', request.id), {
         status: 'accepted',
       });
-      Alert.alert('Đã chấp nhận lời mời kết bạn!');
+
+      // Thêm vào collection `friends`
+      const friendId = request.from;
+      await setDoc(doc(db, 'friends', `${currentUser.uid}_${friendId}`), {
+        users: [currentUser.uid, friendId],
+        createdAt: new Date(),
+      });
+      await setDoc(doc(db, 'friends', `${friendId}_${currentUser.uid}`), {
+        users: [friendId, currentUser.uid],
+        createdAt: new Date(),
+      });
+
+      Alert.alert('✅ Thành công', 'Bạn đã chấp nhận lời mời!');
       setRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (error) {
       console.error(error);
@@ -58,7 +68,7 @@ export default function FriendRequestsScreen() {
   const rejectRequest = async (request) => {
     try {
       await deleteDoc(doc(db, 'friend_requests', request.id));
-      Alert.alert('Đã từ chối lời mời.');
+      Alert.alert('Đã từ chối lời mời kết bạn.');
       setRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (error) {
       console.error(error);
@@ -67,13 +77,13 @@ export default function FriendRequestsScreen() {
   };
 
   const renderItem = ({ item }) => (
-    <View style={styles.requestItem}>
-      <Text style={styles.emailText}>Từ: {item.senderName}</Text>
-      <View style={styles.buttons}>
-        <TouchableOpacity onPress={() => acceptRequest(item)} style={styles.acceptBtn}>
+    <View style={styles.card}>
+      <Text style={styles.email}>Từ: {item.from}</Text>
+      <View style={styles.actions}>
+        <TouchableOpacity onPress={() => acceptRequest(item)} style={styles.accept}>
           <Text style={styles.btnText}>Chấp nhận</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => rejectRequest(item)} style={styles.rejectBtn}>
+        <TouchableOpacity onPress={() => rejectRequest(item)} style={styles.reject}>
           <Text style={styles.btnText}>Từ chối</Text>
         </TouchableOpacity>
       </View>
@@ -82,68 +92,44 @@ export default function FriendRequestsScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Lời mời kết bạn</Text>
+      <Text style={styles.header}>Lời mời kết bạn</Text>
       <FlatList
         data={requests}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderItem}
-        ListEmptyComponent={<Text style={styles.emptyText}>Không có lời mời nào.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>Không có lời mời nào.</Text>}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f1f1f1',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  requestItem: {
-    padding: 15,
+  container: { flex: 1, padding: 20, backgroundColor: '#f1f1f1' },
+  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
+  card: {
     backgroundColor: '#fff',
+    padding: 15,
     borderRadius: 8,
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 3,
   },
-  emailText: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  buttons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  acceptBtn: {
+  email: { fontSize: 16, marginBottom: 10 },
+  actions: { flexDirection: 'row', justifyContent: 'space-between' },
+  accept: {
     backgroundColor: '#28a745',
     padding: 10,
-    borderRadius: 6,
+    borderRadius: 5,
     flex: 1,
     marginRight: 10,
     alignItems: 'center',
   },
-  rejectBtn: {
+  reject: {
     backgroundColor: '#dc3545',
     padding: 10,
-    borderRadius: 6,
+    borderRadius: 5,
     flex: 1,
     alignItems: 'center',
   },
-  btnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 40,
-    color: '#888',
-  },
+  btnText: { color: '#fff', fontWeight: 'bold' },
+  empty: { textAlign: 'center', marginTop: 50, color: '#888' },
 });

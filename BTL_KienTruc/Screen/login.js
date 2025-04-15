@@ -1,17 +1,33 @@
-// BTL_KienTruc/Screen/login.js
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../Firebase/Firebase'; // import Firestore
+import { useUser } from './UserContext'; // dùng UserContext
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const auth = getAuth();
+  const { setUser } = useUser(); // Lấy hàm setUser
 
   const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigation.navigate('MainApp'); // Chuyển đến màn hình chính
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // ✅ Lấy dữ liệu người dùng từ Firestore
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        setUser(userData); // Cập nhật context
+        navigation.navigate('MainApp'); // Chuyển đến màn hình chính
+      } else {
+        Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng.');
+      }
+
     } catch (error) {
       Alert.alert('Lỗi', error.message);
     }
@@ -38,11 +54,9 @@ export default function LoginScreen({ navigation }) {
         <TouchableOpacity onPress={handleLogin} style={styles.btnLogin}>
           <Text style={styles.btnText}>ĐĂNG NHẬP</Text>
         </TouchableOpacity>
-        
         <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotPasswordBtn}>
           <Text style={styles.link}>Quên mật khẩu?</Text>
         </TouchableOpacity>
-
         <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.registerBtn}>
           <Text style={styles.link}>Đăng ký tài khoản mới</Text>
         </TouchableOpacity>
@@ -69,10 +83,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 6,

@@ -2,55 +2,71 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { db } from '../Firebase/Firebase';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp,doc, setDoc } from 'firebase/firestore';
 
-export default function ChatsScreen() {
+export default function ChatsScreen({ route }) {
+  // 🧠 Giả lập người dùng (sau này thay bằng auth.currentUser.uid)
+  const { currentUserId = 'userA', chatWithUserId = 'userB' } = route?.params || {};
+
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
 
   useEffect(() => {
-    // socketService.connect('qruvhn82ll');
+    const q = query(collection(db, 'message'), orderBy('createdAt', 'asc'));
 
-    // socketService.subscribeToMessages((message) => {
-    //   setMessages((prevMessages) => [...prevMessages, message]);
-    // });
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const filteredMessages = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((msg) =>
+          (msg.senderId === currentUserId && msg.receiverId === chatWithUserId) ||
+          (msg.senderId === chatWithUserId && msg.receiverId === currentUserId)
+        );
 
-    // return () => {
-    //   socketService.disconnect();
-    // };
-  }, []);
+      setMessages(filteredMessages);
+    });
 
-  const sendMessage = () => {
+    return () => unsubscribe();
+  }, [currentUserId, chatWithUserId]);
+
+  const sendMessage = async () => {
     if (inputText.trim()) {
-      const newMessage = { id: Date.now().toString(), text: inputText, sender: 'user' };
-      // socketService.sendMessage(newMessage);
+      await addDoc(collection(db, 'message'), {
+        senderId: currentUserId,
+        receiverId: chatWithUserId,
+        text: inputText,
+        createdAt: serverTimestamp(),
+      });
       setInputText('');
     }
   };
 
   const uploadImage = () => {
-    launchImageLibrary({ mediaType: 'photo' }, (response) => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.error) {
-        console.log('ImagePicker Error: ', response.error);
+    launchImageLibrary({ mediaType: 'photo' }, async (response) => {
+      if (response.didCancel || response.errorCode) {
+        console.log('User cancelled or error');
       } else {
-        const newMessage = {
-          id: Date.now().toString(),
+        const uri = response.assets[0].uri;
+        await addDoc(collection(db, 'message'), {
+          senderId: currentUserId,
+          receiverId: chatWithUserId,
+          image: uri,
           text: '',
-          image: response.uri,
-          sender: 'user',
-        };
-        // socketService.sendMessage(newMessage);
+          createdAt: serverTimestamp(),
+        });
       }
     });
   };
 
   const renderMessage = ({ item }) => {
+    const isCurrentUser = item.senderId === currentUserId;
+
     return (
-      <View style={[styles.message, item.sender === 'user' ? styles.userMessage : styles.friendMessage]}>
-        {item.image ? (
+      <View style={[styles.message, isCurrentUser ? styles.userMessage : styles.friendMessage]}>
+        {item.image && (
           <Image source={{ uri: item.image }} style={styles.image} />
-        ) : (
+        )}
+        {item.text !== '' && (
           <Text style={styles.messageText}>{item.text}</Text>
         )}
       </View>
@@ -63,6 +79,7 @@ export default function ChatsScreen() {
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
+        contentContainerStyle={{ paddingBottom: 80 }}
       />
       <View style={styles.inputContainer}>
         <TextInput
@@ -73,10 +90,7 @@ export default function ChatsScreen() {
           placeholderTextColor="#a0a0a0"
         />
         <TouchableOpacity onPress={uploadImage} style={styles.uploadButton}>
-          <Icon name="download" size={20} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => {/* Logic để mở emoji */}} style={styles.emojiButton}>
-          <Text style={styles.emojiButtonText}>😀</Text>
+          <Icon name="image" size={22} color="#3f15d6" />
         </TouchableOpacity>
         <TouchableOpacity onPress={sendMessage} style={styles.sendButton}>
           <Text style={styles.sendButtonText}>Send</Text>
@@ -96,6 +110,7 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     marginHorizontal: 10,
     borderRadius: 10,
+    maxWidth: '75%',
   },
   userMessage: {
     backgroundColor: '#3f15d6',
@@ -107,6 +122,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     color: '#fff',
+    fontSize: 16,
   },
   image: {
     width: 200,
@@ -114,36 +130,36 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   inputContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     padding: 10,
+    backgroundColor: '#fff',
+    alignItems: 'center',
     borderTopWidth: 1,
     borderColor: '#ccc',
   },
   input: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
     borderRadius: 20,
     paddingHorizontal: 15,
+    paddingVertical: 8,
     marginRight: 10,
   },
   sendButton: {
     backgroundColor: '#3f15d6',
     borderRadius: 20,
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
   },
   sendButtonText: {
     color: '#fff',
     fontWeight: 'bold',
   },
   uploadButton: {
-    padding: 10,
-  },
-  emojiButton: {
-    padding: 10,
-  },
-  emojiButtonText: {
-    color: '#fff',
-    fontSize: 20,
+    marginRight: 10,
   },
 });

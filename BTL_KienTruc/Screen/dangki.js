@@ -1,15 +1,21 @@
-// BTL_KienTruc/Screen/dangki.js
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore'; // 💥 thêm dòng này
+import { db } from '../Firebase/Firebase';         // 💥 và dòng này
 
 export default function RegisterScreen({ navigation }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const auth = getAuth();
 
   const handleRegister = async () => {
+    if (!name.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập họ tên.');
+      return;
+    }
     if (password !== confirmPassword) {
       Alert.alert('Lỗi', 'Mật khẩu và xác nhận mật khẩu không khớp.');
       return;
@@ -22,18 +28,26 @@ export default function RegisterScreen({ navigation }) {
       Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ email hợp lệ.');
       return;
     }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
       await sendEmailVerification(user);
-      Alert.alert('Thành công', 'Email xác minh đã được gửi!');
 
-      // Điều hướng đến màn hình OTP sau khi đăng ký thành công
-      navigation.navigate('Otp', { email }); // Gửi email đến màn hình OTP
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        name: name,
+        avatar: `https://i.pravatar.cc/150?u=${user.uid}`,
+      });
+
+      Alert.alert('Thành công', 'Email xác minh đã được gửi!');
+      navigation.navigate('Otp', { email });
+
     } catch (error) {
       console.error(error);
-      Alert.alert('Lỗi', error.message);
+      Alert.alert('Lỗi', error.message); // 🧠 lỗi có thể là "ReferenceError: setDoc is not defined"
     }
   };
 
@@ -43,9 +57,16 @@ export default function RegisterScreen({ navigation }) {
       <View style={styles.cardRegister}>
         <TextInput
           style={styles.input}
+          placeholder="Nhập họ tên"
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={styles.input}
           placeholder="Nhập email"
           value={email}
           onChangeText={setEmail}
+          autoCapitalize="none"
         />
         <TextInput
           style={styles.input}
@@ -61,15 +82,14 @@ export default function RegisterScreen({ navigation }) {
           value={confirmPassword}
           onChangeText={setConfirmPassword}
         />
-        
         <TouchableOpacity style={styles.btnRegister} onPress={handleRegister}>
           <Text style={styles.btnText}>ĐĂNG KÝ</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
+  
 }
-
 const styles = StyleSheet.create({
   mainRegister: {
     flex: 1,
@@ -88,10 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 6,

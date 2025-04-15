@@ -10,7 +10,7 @@ import TimelineScreen from './TimelineScreen';
 import ProfileScreen from './ProfileScreen';
 import AddFriendScreen from './AddFriendScreen';
 import EditProfileScreen from './EditProfile';
-
+import FriendRequestsScreen from './FriendRequestsScreen';
 const Tab = createBottomTabNavigator();
 
 export default function MainNavigator() {
@@ -64,6 +64,7 @@ export default function MainNavigator() {
         options={{ title: 'Cá nhân', tabBarStyle: { display: isEditingState ? 'none' : 'flex' } }}
       />
       <Tab.Screen name="EditProfile" component={(props) => <EditProfileScreen {...props} setIsEditing={setIsEditingState} />} options={{ title: 'Chỉnh Sửa' }} />
+      <Tab.Screen name="FriendRequests" component={FriendRequestsScreen} />
     </Tab.Navigator>
   );
 }

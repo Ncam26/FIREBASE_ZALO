@@ -1,7 +1,6 @@
-// BTL_KienTruc/Screen/otp.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import axios from 'axios'; // Thêm axios để gọi API
+import axios from 'axios'; // Dùng để gửi OTP qua email
 
 const generateUniqueCode = () => {
   const digits = new Set();
@@ -12,33 +11,53 @@ const generateUniqueCode = () => {
 };
 
 export default function OtpScreen({ navigation, route }) {
-  const { email } = route.params; // Nhận email từ tham số
+  const { email } = route.params; // Nhận email từ Register
   const [otp, setOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [isExpired, setIsExpired] = useState(false);
+  const [countdown, setCountdown] = useState(60);
 
   useEffect(() => {
+    const code = generateUniqueCode();
+    setGeneratedOtp(code);
+    sendOtpEmail(email, code);
+
+    setIsExpired(false);
+    setCountdown(60);
+
     const timer = setTimeout(() => {
       setIsExpired(true);
-      Alert.alert('Hết hạn', 'Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.');
-    }, 60000); // 60 giây
+    }, 60000);
 
-    return () => clearTimeout(timer); // Dọn dẹp timer khi component unmount
+    const countdownInterval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === 1) clearInterval(countdownInterval);
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(countdownInterval);
+    };
   }, []);
 
   const sendOtpEmail = async (email, code) => {
     try {
-      await axios.post('http://localhost:3000/send-otp', { email, code }); // Thay localhost bằng URL của API nếu cần
+      await axios.post('http://192.168.8.149:3000/send-otp', { email, code }); // ⚠️ sửa lại đường dẫn API thật
       Alert.alert('Thành công', 'Mã OTP đã được gửi qua email.');
     } catch (error) {
+      console.error(error);
       Alert.alert('Lỗi', 'Không thể gửi mã OTP. Vui lòng thử lại.');
     }
   };
 
-  const handleSendOtp = async () => {
-    const code = generateUniqueCode();
-    setGeneratedOtp(code);
-    await sendOtpEmail(email, code); // Gọi hàm gửi email
+  const handleResendOtp = () => {
+    const newCode = generateUniqueCode();
+    setGeneratedOtp(newCode);
+    sendOtpEmail(email, newCode);
+    setIsExpired(false);
+    setCountdown(60);
   };
 
   const handleVerifyOtp = () => {
@@ -47,67 +66,79 @@ export default function OtpScreen({ navigation, route }) {
       return;
     }
     if (otp === generatedOtp) {
-      Alert.alert('Thành công', 'Mã OTP hợp lệ!');
-      navigation.navigate('Login'); // Quay lại màn hình đăng nhập
+      Alert.alert('Thành công', 'Xác minh thành công!');
+      navigation.replace('MainApp');
     } else {
-      Alert.alert('Lỗi', 'Mã OTP không hợp lệ.');
+      Alert.alert('Lỗi', 'Mã OTP không chính xác.');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Nhập mã OTP</Text>
-      <TouchableOpacity style={styles.btn} onPress={handleSendOtp}>
-        <Text style={styles.btnText}>Gửi mã OTP</Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>Xác minh OTP</Text>
+      <Text style={styles.subText}>Mã đã gửi đến email: {email}</Text>
+
       <TextInput
         style={styles.input}
         placeholder="Nhập mã OTP"
         value={otp}
         onChangeText={setOtp}
+        keyboardType="numeric"
+        maxLength={6}
       />
-      <TouchableOpacity style={styles.btn} onPress={handleVerifyOtp}>
-        <Text style={styles.btnText}>Xác nhận mã OTP</Text>
+
+      <TouchableOpacity style={styles.btnVerify} onPress={handleVerifyOtp}>
+        <Text style={styles.btnText}>Xác nhận OTP</Text>
       </TouchableOpacity>
-      {isExpired && <Text style={styles.expiredText}>Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.</Text>}
+
+      <Text style={styles.countdown}>
+        {isExpired ? 'Mã đã hết hạn.' : `Mã sẽ hết hạn sau: ${countdown}s`}
+      </Text>
+
+      <TouchableOpacity
+        style={[styles.btnResend, isExpired ? {} : { backgroundColor: '#aaa' }]}
+        onPress={handleResendOtp}
+        disabled={!isExpired}
+      >
+        <Text style={styles.btnText}>Gửi lại mã OTP</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  title: {
-    fontSize: 24,
-    marginBottom: 20,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', padding: 20 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
+  subText: { fontSize: 16, color: '#555', marginBottom: 20 },
   input: {
+    width: '80%',
     height: 50,
     borderColor: '#ccc',
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    borderRadius: 8,
+    paddingHorizontal: 15,
     marginBottom: 15,
-    width: '80%',
-  },
-  btn: {
-    backgroundColor: '#007BFF',
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    width: '80%',
-  },
-  btnText: {
-    color: '#fff',
+    backgroundColor: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    textAlign: 'center',
+    letterSpacing: 4,
   },
-  expiredText: {
-    color: 'red',
+  btnVerify: {
+    backgroundColor: '#28a745',
+    padding: 15,
+    borderRadius: 10,
+    width: '80%',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnResend: {
+    backgroundColor: '#007BFF',
+    padding: 12,
+    borderRadius: 8,
+    width: '80%',
+    alignItems: 'center',
     marginTop: 10,
   },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  countdown: { marginTop: 10, color: '#888', fontSize: 14 },
 });

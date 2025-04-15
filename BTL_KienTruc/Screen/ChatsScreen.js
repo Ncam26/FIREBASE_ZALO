@@ -3,19 +3,20 @@ import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Image } 
 import { launchImageLibrary } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { db, storage } from '../Firebase/Firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, setDoc, getDocs, where } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, doc, setDoc, getDocs, where } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import uuid from 'react-native-uuid';
 
+const MESSAGE_COLLECTION = 'Messages';
+
 export default function ChatsScreen({ route }) {
-  const { currentUserId = 'userA', chatWithUserId = 'userB' } = route?.params || {};
+  const { currentUserId , chatWithUserId } = route?.params || {};
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [conversationId, setConversationId] = useState(null);
 
   useEffect(() => {
     const findOrCreateConversation = async () => {
-      console.log('🔍 Checking for existing conversation...');
       const q = query(collection(db, 'UserConversation'), where('user_id', '==', currentUserId));
       const snapshot = await getDocs(q);
 
@@ -31,7 +32,6 @@ export default function ChatsScreen({ route }) {
       }
 
       if (!found) {
-        console.log('❌ No existing conversation found. Creating new...');
         const newConId = `con_${uuid.v4()}`;
         await addDoc(collection(db, 'UserConversation'), {
           con_id: newConId,
@@ -42,6 +42,7 @@ export default function ChatsScreen({ route }) {
           user_id: chatWithUserId
         });
         await setDoc(doc(db, 'Conversations', newConId), {
+          con_id: newConId,
           admin: currentUserId,
           is_group: false,
           members: [currentUserId, chatWithUserId],
@@ -50,10 +51,8 @@ export default function ChatsScreen({ route }) {
           time: Date.now()
         });
         setConversationId(newConId);
-        console.log('✅ Created conversation with ID:', newConId);
       } else {
         setConversationId(found);
-        console.log('✅ Found existing conversation with ID:', found);
       }
     };
 
@@ -62,23 +61,20 @@ export default function ChatsScreen({ route }) {
 
   useEffect(() => {
     if (!conversationId) return;
-    console.log('📡 Subscribing to messages for conversation:', conversationId);
-    const q = query(collection(db, 'Messages'), where('con_id', '==', conversationId));
+    const q = query(collection(db, MESSAGE_COLLECTION), where('con_id', '==', conversationId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log('📨 New messages received:', msgs);
-      setMessages(msgs);
+      const sortedMsgs = msgs.sort((a, b) => a.timestamp - b.timestamp);
+      setMessages(sortedMsgs);
     });
     return () => unsubscribe();
   }, [conversationId]);
 
   const sendMessage = async () => {
     if (inputText.trim() && conversationId) {
-      console.log('✉️ Sending text message:', inputText);
-      await addDoc(collection(db, 'Message'), {
+      await addDoc(collection(db, MESSAGE_COLLECTION), {
         con_id: conversationId,
         sender_id: currentUserId,
-        receiver_id: chatWithUserId,
         content: inputText,
         type: 'text',
         createdAt: Date.now(),
@@ -99,15 +95,13 @@ export default function ChatsScreen({ route }) {
       const fileName = `${uuid.v4()}-${asset.fileName}`;
       const fileRef = ref(getStorage(), `uploads/${fileName}`);
 
-      console.log('📤 Uploading file to Firebase Storage:', asset.uri);
       const responseBlob = await fetch(asset.uri);
       const blob = await responseBlob.blob();
 
       await uploadBytes(fileRef, blob);
       const downloadURL = await getDownloadURL(fileRef);
-      console.log('✅ File uploaded. URL:', downloadURL);
 
-      await addDoc(collection(db, 'Message'), {
+      await addDoc(collection(db, MESSAGE_COLLECTION), {
         con_id: conversationId,
         sender_id: currentUserId,
         receiver_id: chatWithUserId,
@@ -124,14 +118,12 @@ export default function ChatsScreen({ route }) {
     const isCurrentUser = item.sender_id === currentUserId;
 
     return (
-      <View style={[styles.message, isCurrentUser ? styles.userMessage : styles.friendMessage]}>
-        {item.type === 'image' && <Image source={{ uri: item.url }} style={styles.image} />}
-        {item.type === 'video' && (
-          <Text style={styles.messageText}>[Video: {item.url}]</Text>
-        )}
-        {item.type === 'text' && item.content && (
-          <Text style={styles.messageText}>{item.content}</Text>
-        )}
+      <View style={[styles.messageContainer, isCurrentUser ? styles.userAlign : styles.friendAlign]}>
+        <View style={[styles.message, isCurrentUser ? styles.userMessage : styles.friendMessage]}>
+          {item.type === 'image' && <Image source={{ uri: item.url }} style={styles.image} />}
+          {item.type === 'video' && <Text style={styles.messageText}>[Video: {item.url}]</Text>}
+          {item.type === 'text' && item.content && <Text style={styles.messageText}>{item.content}</Text>}
+        </View>
       </View>
     );
   };
@@ -165,7 +157,10 @@ export default function ChatsScreen({ route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f1f1' },
-  message: { padding: 10, marginVertical: 5, marginHorizontal: 10, borderRadius: 10, maxWidth: '75%' },
+  messageContainer: { flexDirection: 'row', marginVertical: 5, marginHorizontal: 10 },
+  userAlign: { justifyContent: 'flex-end' },
+  friendAlign: { justifyContent: 'flex-start' },
+  message: { padding: 10, borderRadius: 10, maxWidth: '75%' },
   userMessage: { backgroundColor: '#3f15d6', alignSelf: 'flex-end' },
   friendMessage: { backgroundColor: '#514869', alignSelf: 'flex-start' },
   messageText: { color: '#fff', fontSize: 16 },

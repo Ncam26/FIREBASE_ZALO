@@ -35,11 +35,13 @@ export default function RegisterScreen({ navigation }) {
 
       await sendEmailVerification(user);
 
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
+      await setDoc(doc(db, 'Users', user.uid), {
+        user_id: user.uid,
         email: user.email,
-        name: name,
-        avatar: `https://i.pravatar.cc/150?u=${user.uid}`,
+        fullName: name,
+        img: '',
+        status: 'offline',
+        lastSeen: new Date()
       });
 
       Alert.alert('Thành công', 'Email xác minh đã được gửi!');

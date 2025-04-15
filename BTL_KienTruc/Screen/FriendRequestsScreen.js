@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { db } from '../Firebase/Firebase';
 import { getAuth } from 'firebase/auth';
+import { user } from './UserContext';
 import {
   collection,
   query,
@@ -17,11 +18,11 @@ export default function FriendRequestsScreen() {
   const [requests, setRequests] = useState([]);
   const auth = getAuth();
   const currentUser = auth.currentUser;
-
   useEffect(() => {
     if (!currentUser) return;
 
     const fetchRequests = async () => {
+      
       try {
         const q = query(collection(db, 'friend_requests'), where('to', '==', currentUser.uid), where('status', '==', 'pending'));
         const snapshot = await getDocs(q);
@@ -29,6 +30,7 @@ export default function FriendRequestsScreen() {
           id: docSnap.id,
           ...docSnap.data(),
         }));
+        
         setRequests(result);
       } catch (err) {
         console.error(err);

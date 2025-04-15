@@ -19,20 +19,20 @@ export default function ProfileScreen({ navigation, setIsEditing }) {
     <View style={styles.container}>
       <Image
         style={styles.avatar}
-        source={{ uri: 'https://img-cdn.2game.vn/pictures/2game/2019/10/09/2game-natra-ma-dong-h5-logo-1.png' }} // Thay thế bằng URL ảnh đại diện thực tế
+        source={user.img} // Thay thế bằng URL ảnh đại diện thực tế
       />
-      <Text style={styles.name}>{user.name}</Text>
+      <Text style={styles.name}>{user.fullName}</Text>
       <Text style={styles.email}>{user.email}</Text>
       <View style={styles.infoContainer}>
         <Text style={styles.infoLabel}>Số điện thoại:</Text>
-        <Text style={styles.infoValue}>{user.phone}</Text>
+        <Text style={styles.infoValue}>{user.phoneNumber}</Text>
       </View>
       <View style={styles.infoContainer}>
         <Text style={styles.infoLabel}>Địa chỉ:</Text>
-        <Text style={styles.infoValue}>{user.address}</Text>
+        <Text style={styles.infoValue}>{user.id}</Text>
       </View>
       <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-        <Text style={styles.logoutButtonText}>Log Out</Text>
+        <Text style={styles.logoutButtonText}>Đăng xuất</Text>
       </TouchableOpacity>
       <TouchableOpacity onPress={handleEditProfile} style={styles.editButton}>
         <Text style={styles.editButtonText}>Chỉnh sửa</Text>

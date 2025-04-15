@@ -13,10 +13,10 @@ export default function EditProfile({ navigation }) {
     );
   }
 
-  const [name, setName] = useState(user.name || '');
+  const [name, setName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
-  const [phone, setPhone] = useState(user.phone || '');
-  const [address, setAddress] = useState(user.address || '');
+  const [phone, setPhone] = useState(user.phoneNumber || '');
+  const [address, setAddress] = useState(user.id || '');
 
   const handleSave = () => {
     setUser({

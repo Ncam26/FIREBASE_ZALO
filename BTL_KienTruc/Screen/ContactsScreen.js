@@ -6,6 +6,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function ContactsScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
+  const [isLoading, setIsLoading] = useState(true); // 👉 trạng thái loading
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
@@ -14,8 +15,7 @@ export default function ContactsScreen({ navigation }) {
 
     const fetchFriends = async () => {
       try {
-        // Tìm những người đã accepted với currentUser
-        const q = query(
+        const q1 = query(
           collection(db, 'friend_requests'),
           where('status', '==', 'accepted'),
           where('from', '==', currentUser.uid)
@@ -26,17 +26,15 @@ export default function ContactsScreen({ navigation }) {
           where('to', '==', currentUser.uid)
         );
 
-        const [fromSnap, toSnap] = await Promise.all([getDocs(q), getDocs(q2)]);
+        const [fromSnap, toSnap] = await Promise.all([getDocs(q1), getDocs(q2)]);
 
-        // Tạo danh sách UID bạn bè
         const friendIds = new Set();
         fromSnap.forEach(doc => friendIds.add(doc.data().to));
         toSnap.forEach(doc => friendIds.add(doc.data().from));
 
-        // Lấy thông tin user từ collection 'users'
         const userDocs = await Promise.all(
           Array.from(friendIds).map(async uid => {
-            const userQ = query(collection(db, 'users'), where('uid', '==', uid));
+            const userQ = query(collection(db, 'Users'), where('user_id', '==', uid));
             const userSnap = await getDocs(userQ);
             return userSnap.docs[0]?.data();
           })
@@ -45,6 +43,8 @@ export default function ContactsScreen({ navigation }) {
         setFriends(userDocs.filter(Boolean));
       } catch (error) {
         console.error(error);
+      } finally {
+        setIsLoading(false); // 👉 chỉ hiển thị khi xong
       }
     };
 
@@ -54,23 +54,25 @@ export default function ContactsScreen({ navigation }) {
   const handleSelectUser = (friend) => {
     navigation.navigate('Chats', {
       currentUserId: currentUser.uid,
-      chatWithUserId: friend.uid,
+      chatWithUserId: friend.user_id,
     });
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Bạn bè của bạn:</Text>
-      <FlatList
-        data={friends}
-        keyExtractor={(item) => item.uid}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.userItem} onPress={() => handleSelectUser(item)}>
-            <Text style={styles.userText}>{item.name}</Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={<Text style={{ color: '#888' }}>Bạn chưa có bạn bè nào!</Text>}
-      />
+      {!isLoading && (
+        <FlatList
+          data={friends}
+          keyExtractor={(item) => item.user_id}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.userItem} onPress={() => handleSelectUser(item)}>
+              <Text style={styles.userText}>{item.fullName || item.name}</Text>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={<Text style={{ color: '#888' }}>Bạn chưa có bạn bè nào!</Text>}
+        />
+      )}
     </View>
   );
 }

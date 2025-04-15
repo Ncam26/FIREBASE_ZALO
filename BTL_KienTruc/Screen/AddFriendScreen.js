@@ -16,7 +16,7 @@ export default function AddFriendScreen() {
     }
 
     try {
-      const usersRef = collection(db, 'users');
+      const usersRef = collection(db, 'Users');
       const q = query(usersRef, where('email', '==', email));
       const querySnapshot = await getDocs(q);
 
@@ -26,7 +26,9 @@ export default function AddFriendScreen() {
       }
 
       const targetUser = querySnapshot.docs[0].data();
-      const targetUserId = targetUser.uid;
+      const targetUserId = targetUser.user_id;
+      console.log(targetUser)
+      console.log(targetUserId)
 
       if (targetUserId === currentUser.uid) {
         Alert.alert('Lỗi', 'Không thể kết bạn với chính mình.');

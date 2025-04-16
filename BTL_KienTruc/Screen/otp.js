@@ -44,7 +44,7 @@ export default function OtpScreen({ navigation, route }) {
 
   const sendOtpEmail = async (email, code) => {
     try {
-      await axios.post('http://192.168.8.149:3000/send-otp', { email, code }); // ⚠️ sửa lại đường dẫn API thật
+      await axios.post('http://192.168.1.92:3000/send-otp', { email, code }); // ⚠️ sửa lại đường dẫn API thật
       Alert.alert('Thành công', 'Mã OTP đã được gửi qua email.');
     } catch (error) {
       console.error(error);
